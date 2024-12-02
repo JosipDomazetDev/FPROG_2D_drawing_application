@@ -14,17 +14,18 @@ module Sorting =
     
 let tests =
     testList "Main" [
+        PolygonDrawing.Tests.polygonEditingTests
         test "Hello World" {
             let subject = "Hello World"
             Expect.equal subject "Hello World" "The strings should equal"
         }
         test "Sorting" {
-            FsCheck.Check.Quick Sorting.canSort
+            FsCheck.Check.QuickThrowOnFailure Sorting.canSort
         }
-        PolygonDrawing.Tests.polygonEditingTests
     ]
 
 
 [<EntryPoint>]
 let main args =
-  runTestsWithCLIArgs [] args tests
+    let a = [CLIArguments.Debug; CLIArguments.Sequenced]
+    runTestsWithCLIArgs a args tests

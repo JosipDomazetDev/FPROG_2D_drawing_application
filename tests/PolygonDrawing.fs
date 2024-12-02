@@ -31,6 +31,13 @@ module Tests =
             let result = ignorePast afterUndo
             original = result
 
+        let test() =
+            for m in applicationStates do
+                FsCheck.Check.One( { Config.Default with Arbitrary = [typeof<Overrides>]; }, undoUndoes m )
+            
+
+    let config = 
+        { FsCheckConfig.defaultConfig with arbitrary = [typeof<Overrides>];  }
 
     let polygonEditingTests =   
         testList "Main" [
@@ -42,28 +49,25 @@ module Tests =
                 Expect.equal empty (PolygonDrawing.update Msg.Undo empty |> fst |> ignorePast) "model"
             }
 
-            test "canUndoArbitraryProperties" {
-                for m in applicationStates do
-                    FsCheck.Check.One( { Config.Default with Arbitrary = [typeof<Overrides>]; }, Properties.undoUndoes m )
-            }
-            
-            yield! applicationStates |> List.mapi (fun i m ->
-                test $"canUndoArbitraryProperties_{i}" {
-                    FsCheck.Check.One( { Config.Default with Arbitrary = [typeof<Overrides>]; }, Properties.undoUndoes m )
-                }
+            testList "undo properties" (
+                applicationStates |> List.mapi (fun i m -> 
+                    testPropertyWithConfig config $"can undo starting from state {i}" (Properties.undoUndoes m)
+                )
             )
 
-            yield! applicationStates |> List.mapi (fun i m ->
-                test $"canDrawTrianglesToAnyState_{i}" {
-                    let pointsDrawn = 
-                        triangle 
-                        |> List.rev
-                        |> List.fold (fun model point -> PolygonDrawing.update (Msg.AddPoint point) model |> fst) m
-                        |> PolygonDrawing.update Msg.FinishPolygon |> fst
+            testList "draw triangle to states" (
+                applicationStates |> List.mapi (fun i m ->
+                    test $"canDrawTrianglesToAnyState_{i}" {
+                        let pointsDrawn = 
+                            triangle 
+                            |> List.rev
+                            |> List.fold (fun model point -> PolygonDrawing.update (Msg.AddPoint point) model |> fst) m
+                            |> PolygonDrawing.update Msg.FinishPolygon |> fst
 
-                    Expect.equal pointsDrawn.currentPolygon None "current empty after drawing"
-                    let hasBeenAdded = pointsDrawn.finishedPolygons |> List.contains triangle
-                    Expect.isTrue hasBeenAdded "drawing polygon has been added"
-                }
+                        Expect.equal pointsDrawn.currentPolygon None "current polygon is not empty after draing"
+                        let hasBeenAdded = pointsDrawn.finishedPolygons |> List.contains triangle
+                        Expect.isTrue hasBeenAdded "the polygon cannot be found in the result state"
+                    }
+                )
             )
         ]
