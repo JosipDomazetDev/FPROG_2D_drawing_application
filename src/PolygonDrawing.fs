@@ -53,7 +53,6 @@ let init () =
 
 
 (*
-TODO: implement the core logics of the drawing app, which means:
 Depending on the message,
 For AddPoint mesages, add the point to the current polygon.
  - if there is no current polygon yet, create a new one with this point as its only vertex.
@@ -63,8 +62,32 @@ For FinishPolygon mesages:
  - if there is a current polygon, reset the current polygon to None and add the current polygon as a new elemnet to finishedPolygons.
 *)
 let updateModel (msg : Msg) (model : Model) =
-    model
+    match msg with
+    | AddPoint pos ->
+        match model.currentPolygon with
+        | None ->
+            // start a new polygon with the clicked point
+            { model with currentPolygon = Some [pos] }
+        | Some points ->
+            // add a new point to the existing polygon
+            { model with currentPolygon = Some (pos :: points) }
 
+    | FinishPolygon ->
+        match model.currentPolygon with
+        | None ->
+            // no current polygon, nothing to finish
+            model
+        | Some poly ->
+            // finish the polygon: move it to finishedPolygons and clear currentPolygon
+            { model with
+                finishedPolygons = poly :: model.finishedPolygons
+                currentPolygon = None }
+
+    // SetCursorPos, Undo, Redo are handled separately in addUndoRedo
+    // so here we just return model if they appear.
+    | _ -> model
+    
+    
 // wraps an update function with undo/redo.
 let addUndoRedo (updateFunction : Msg -> Model -> Model) (msg : Msg) (model : Model) =
     // first let us, handle the cursor position, which is not undoable, and handle undo/redo messages
@@ -74,12 +97,17 @@ let addUndoRedo (updateFunction : Msg -> Model -> Model) (msg : Msg) (model : Mo
         // update the mouse position and create a new model.
         { model with mousePos = p }
     | Undo -> 
-        // TODO implement undo logics, HINT: restore the model stored in past, and replace the current
-        // state with it.
-        model
+        match model.past with
+        | None -> model
+        | Some oldModel ->
+            // restore oldModel and set current model as future
+            { oldModel with future = Some model }
     | Redo -> 
-        // TODO: same as undo
-        model
+        match model.future with
+        | None -> model
+        | Some futureModel ->
+            // restore futureModel and set current model as past
+            { futureModel with past = Some model }
     | _ -> 
         // use the provided update function for all remaining messages
         { updateFunction msg model with past = Some model }
